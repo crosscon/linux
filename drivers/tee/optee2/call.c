@@ -23,21 +23,21 @@
 #endif
 
 
-struct optee_call_waiter {
+struct optee2_call_waiter {
 	struct list_head list_node;
 	struct completion c;
 };
 
-static void optee_cq_wait_init(struct optee_call_queue *cq,
-			       struct optee_call_waiter *w)
+static void optee2_cq_wait_init(struct optee2_call_queue *cq,
+			       struct optee2_call_waiter *w)
 {
 	/*
 	 * We're preparing to make a call to secure world. In case we can't
 	 * allocate a thread in secure world we'll end up waiting in
-	 * optee_cq_wait_for_completion().
+	 * optee2_cq_wait_for_completion().
 	 *
 	 * Normally if there's no contention in secure world the call will
-	 * complete and we can cleanup directly with optee_cq_wait_final().
+	 * complete and we can cleanup directly with optee2_cq_wait_final().
 	 */
 	mutex_lock(&cq->mutex);
 
@@ -53,8 +53,8 @@ static void optee_cq_wait_init(struct optee_call_queue *cq,
 	mutex_unlock(&cq->mutex);
 }
 
-static void optee_cq_wait_for_completion(struct optee_call_queue *cq,
-					 struct optee_call_waiter *w)
+static void optee2_cq_wait_for_completion(struct optee2_call_queue *cq,
+					 struct optee2_call_waiter *w)
 {
 	wait_for_completion(&w->c);
 
@@ -68,9 +68,9 @@ static void optee_cq_wait_for_completion(struct optee_call_queue *cq,
 	mutex_unlock(&cq->mutex);
 }
 
-static void optee_cq_complete_one(struct optee_call_queue *cq)
+static void optee2_cq_complete_one(struct optee2_call_queue *cq)
 {
-	struct optee_call_waiter *w;
+	struct optee2_call_waiter *w;
 
 	list_for_each_entry(w, &cq->waiters, list_node) {
 		if (!completion_done(&w->c)) {
@@ -80,8 +80,8 @@ static void optee_cq_complete_one(struct optee_call_queue *cq)
 	}
 }
 
-static void optee_cq_wait_final(struct optee_call_queue *cq,
-				struct optee_call_waiter *w)
+static void optee2_cq_wait_final(struct optee2_call_queue *cq,
+				struct optee2_call_waiter *w)
 {
 	/*
 	 * We're done with the call to secure world. The thread in secure
@@ -94,7 +94,7 @@ static void optee_cq_wait_final(struct optee_call_queue *cq,
 	list_del(&w->list_node);
 
 	/* Wake up one eventual waiting task */
-	optee_cq_complete_one(cq);
+	optee2_cq_complete_one(cq);
 
 	/*
 	 * If we're completed we've got a completion from another task that
@@ -103,16 +103,16 @@ static void optee_cq_wait_final(struct optee_call_queue *cq,
 	 * waiting task.
 	 */
 	if (completion_done(&w->c))
-		optee_cq_complete_one(cq);
+		optee2_cq_complete_one(cq);
 
 	mutex_unlock(&cq->mutex);
 }
 
 /* Requires the filpstate mutex to be held */
-static struct optee_session *find_session(struct optee_context_data *ctxdata,
+static struct optee2_session *find_session(struct optee2_context_data *ctxdata,
 					  u32 session_id)
 {
-	struct optee_session *sess;
+	struct optee2_session *sess;
 
 	list_for_each_entry(sess, &ctxdata->sess_list, list_node)
 		if (sess->session_id == session_id)
@@ -122,7 +122,7 @@ static struct optee_session *find_session(struct optee_context_data *ctxdata,
 }
 
 /**
- * optee_do_call_with_arg() - Do an SMC to OP-TEE in secure world
+ * optee2_do_call_with_arg() - Do an SMC to OP-TEE in secure world
  * @ctx:	calling context
  * @parg:	physical address of message to pass to secure world
  *
@@ -131,64 +131,64 @@ static struct optee_session *find_session(struct optee_context_data *ctxdata,
  *
  * Returns return code from secure world, 0 is OK
  */
-u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
+u32 optee2_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
 {
-	struct optee *optee = tee_get_drvdata(ctx->teedev);
-	struct optee_call_waiter w;
-	struct optee_rpc_param param = { };
-	struct optee_call_ctx call_ctx = { };
+	struct optee2 *optee2 = tee_get_drvdata(ctx->teedev);
+	struct optee2_call_waiter w;
+	struct optee2_rpc_param param = { };
+	struct optee2_call_ctx call_ctx = { };
 	u32 ret;
 
-	param.a0 = OPTEE_SMC_CALL_WITH_ARG;
+	param.a0 = OPTEE2_SMC_CALL_WITH_ARG;
 	reg_pair_from_64(&param.a1, &param.a2, parg);
 	/* Initialize waiter */
-	optee_cq_wait_init(&optee->call_queue, &w);
+	optee2_cq_wait_init(&optee2->call_queue, &w);
 	while (true) {
-		optee_res_t res;
+		optee2_res_t res;
 
-		optee->invoke_fn(param.a0, param.a1, param.a2, param.a3,
+		optee2->invoke_fn(param.a0, param.a1, param.a2, param.a3,
 				 param.a4, param.a5, param.a6, param.a7,
 				 &res);
 
-		if (res.a0 == OPTEE_SMC_RETURN_ETHREAD_LIMIT) {
+		if (res.a0 == OPTEE2_SMC_RETURN_ETHREAD_LIMIT) {
 			/*
 			 * Out of threads in secure world, wait for a thread
 			 * become available.
 			 */
-			optee_cq_wait_for_completion(&optee->call_queue, &w);
-		} else if (OPTEE_SMC_RETURN_IS_RPC(res.a0)) {
+			optee2_cq_wait_for_completion(&optee2->call_queue, &w);
+		} else if (OPTEE2_SMC_RETURN_IS_RPC(res.a0)) {
 			if (need_resched())
 				cond_resched();
 			param.a0 = res.a0;
 			param.a1 = res.a1;
 			param.a2 = res.a2;
 			param.a3 = res.a3;
-			optee_handle_rpc(ctx, &param, &call_ctx);
+			optee2_handle_rpc(ctx, &param, &call_ctx);
 		} else {
 			ret = res.a0;
 			break;
 		}
 	}
 
-	optee_rpc_finalize_call(&call_ctx);
+	optee2_rpc_finalize_call(&call_ctx);
 	/*
 	 * We're done with our thread in secure world, if there's any
 	 * thread waiters wake up one.
 	 */
-	optee_cq_wait_final(&optee->call_queue, &w);
+	optee2_cq_wait_final(&optee2->call_queue, &w);
 
 	return ret;
 }
 
 static struct tee_shm *get_msg_arg(struct tee_context *ctx, size_t num_params,
-				   struct optee_msg_arg **msg_arg,
+				   struct optee2_msg_arg **msg_arg,
 				   phys_addr_t *msg_parg)
 {
 	int rc;
 	struct tee_shm *shm;
-	struct optee_msg_arg *ma;
+	struct optee2_msg_arg *ma;
 
-	shm = tee_shm_alloc(ctx, OPTEE_MSG_GET_ARG_SIZE(num_params),
+	shm = tee_shm_alloc(ctx, OPTEE2_MSG_GET_ARG_SIZE(num_params),
 			    TEE_SHM_MAPPED);
 	if (IS_ERR(shm))
 		return shm;
@@ -203,7 +203,7 @@ static struct tee_shm *get_msg_arg(struct tee_context *ctx, size_t num_params,
 	if (rc)
 		goto out;
 
-	memset(ma, 0, OPTEE_MSG_GET_ARG_SIZE(num_params));
+	memset(ma, 0, OPTEE2_MSG_GET_ARG_SIZE(num_params));
 	ma->num_params = num_params;
 	*msg_arg = ma;
 out:
@@ -215,33 +215,33 @@ out:
 	return shm;
 }
 
-int optee_open_session(struct tee_context *ctx,
+int optee2_open_session(struct tee_context *ctx,
 		       struct tee_ioctl_open_session_arg *arg,
 		       struct tee_param *param)
 {
-	struct optee_context_data *ctxdata = ctx->data;
+	struct optee2_context_data *ctxdata = ctx->data;
 	int rc;
 	struct tee_shm *shm;
-	struct optee_msg_arg *msg_arg;
+	struct optee2_msg_arg *msg_arg;
 	phys_addr_t msg_parg;
-	struct optee_session *sess = NULL;
+	struct optee2_session *sess = NULL;
 
 	/* +2 for the meta parameters added below */
 	shm = get_msg_arg(ctx, arg->num_params + 2, &msg_arg, &msg_parg);
 	if (IS_ERR(shm))
 		return PTR_ERR(shm);
 
-	msg_arg->cmd = OPTEE_MSG_CMD_OPEN_SESSION;
+	msg_arg->cmd = OPTEE2_MSG_CMD_OPEN_SESSION;
 	msg_arg->cancel_id = arg->cancel_id;
 
 	/*
 	 * Initialize and add the meta parameters needed when opening a
 	 * session.
 	 */
-	msg_arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_VALUE_INPUT |
-				  OPTEE_MSG_ATTR_META;
-	msg_arg->params[1].attr = OPTEE_MSG_ATTR_TYPE_VALUE_INPUT |
-				  OPTEE_MSG_ATTR_META;
+	msg_arg->params[0].attr = OPTEE2_MSG_ATTR_TYPE_VALUE_INPUT |
+				  OPTEE2_MSG_ATTR_META;
+	msg_arg->params[1].attr = OPTEE2_MSG_ATTR_TYPE_VALUE_INPUT |
+				  OPTEE2_MSG_ATTR_META;
 	memcpy(&msg_arg->params[0].u.value, arg->uuid, sizeof(arg->uuid));
 	msg_arg->params[1].u.value.c = arg->clnt_login;
 
@@ -250,7 +250,7 @@ int optee_open_session(struct tee_context *ctx,
 	if (rc)
 		goto out;
 
-	rc = optee_to_msg_param(msg_arg->params + 2, arg->num_params, param);
+	rc = optee2_to_msg_param(msg_arg->params + 2, arg->num_params, param);
 	if (rc)
 		goto out;
 
@@ -260,7 +260,7 @@ int optee_open_session(struct tee_context *ctx,
 		goto out;
 	}
 
-	if (optee_do_call_with_arg(ctx, msg_parg)) {
+	if (optee2_do_call_with_arg(ctx, msg_parg)) {
 		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
 		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
 	}
@@ -275,11 +275,11 @@ int optee_open_session(struct tee_context *ctx,
 		kfree(sess);
 	}
 
-	if (optee_from_msg_param(param, arg->num_params, msg_arg->params + 2)) {
+	if (optee2_from_msg_param(param, arg->num_params, msg_arg->params + 2)) {
 		arg->ret = TEEC_ERROR_COMMUNICATION;
 		arg->ret_origin = TEEC_ORIGIN_COMMS;
 		/* Close session again to avoid leakage */
-		optee_close_session(ctx, msg_arg->session);
+		optee2_close_session(ctx, msg_arg->session);
 	} else {
 		arg->session = msg_arg->session;
 		arg->ret = msg_arg->ret;
@@ -291,13 +291,13 @@ out:
 	return rc;
 }
 
-int optee_close_session(struct tee_context *ctx, u32 session)
+int optee2_close_session(struct tee_context *ctx, u32 session)
 {
-	struct optee_context_data *ctxdata = ctx->data;
+	struct optee2_context_data *ctxdata = ctx->data;
 	struct tee_shm *shm;
-	struct optee_msg_arg *msg_arg;
+	struct optee2_msg_arg *msg_arg;
 	phys_addr_t msg_parg;
-	struct optee_session *sess;
+	struct optee2_session *sess;
 
 	/* Check that the session is valid and remove it from the list */
 	mutex_lock(&ctxdata->mutex);
@@ -313,22 +313,22 @@ int optee_close_session(struct tee_context *ctx, u32 session)
 	if (IS_ERR(shm))
 		return PTR_ERR(shm);
 
-	msg_arg->cmd = OPTEE_MSG_CMD_CLOSE_SESSION;
+	msg_arg->cmd = OPTEE2_MSG_CMD_CLOSE_SESSION;
 	msg_arg->session = session;
-	optee_do_call_with_arg(ctx, msg_parg);
+	optee2_do_call_with_arg(ctx, msg_parg);
 
 	tee_shm_free(shm);
 	return 0;
 }
 
-int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
+int optee2_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
 		      struct tee_param *param)
 {
-	struct optee_context_data *ctxdata = ctx->data;
+	struct optee2_context_data *ctxdata = ctx->data;
 	struct tee_shm *shm;
-	struct optee_msg_arg *msg_arg;
+	struct optee2_msg_arg *msg_arg;
 	phys_addr_t msg_parg;
-	struct optee_session *sess;
+	struct optee2_session *sess;
 	int rc;
 
 	/* Check that the session is valid */
@@ -341,21 +341,21 @@ int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
 	shm = get_msg_arg(ctx, arg->num_params, &msg_arg, &msg_parg);
 	if (IS_ERR(shm))
 		return PTR_ERR(shm);
-	msg_arg->cmd = OPTEE_MSG_CMD_INVOKE_COMMAND;
+	msg_arg->cmd = OPTEE2_MSG_CMD_INVOKE_COMMAND;
 	msg_arg->func = arg->func;
 	msg_arg->session = arg->session;
 	msg_arg->cancel_id = arg->cancel_id;
 
-	rc = optee_to_msg_param(msg_arg->params, arg->num_params, param);
+	rc = optee2_to_msg_param(msg_arg->params, arg->num_params, param);
 	if (rc)
 		goto out;
 
-	if (optee_do_call_with_arg(ctx, msg_parg)) {
+	if (optee2_do_call_with_arg(ctx, msg_parg)) {
 		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
 		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
 	}
 
-	if (optee_from_msg_param(param, arg->num_params, msg_arg->params)) {
+	if (optee2_from_msg_param(param, arg->num_params, msg_arg->params)) {
 		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
 		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
 	}
@@ -367,13 +367,13 @@ out:
 	return rc;
 }
 
-int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session)
+int optee2_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session)
 {
-	struct optee_context_data *ctxdata = ctx->data;
+	struct optee2_context_data *ctxdata = ctx->data;
 	struct tee_shm *shm;
-	struct optee_msg_arg *msg_arg;
+	struct optee2_msg_arg *msg_arg;
 	phys_addr_t msg_parg;
-	struct optee_session *sess;
+	struct optee2_session *sess;
 
 	/* Check that the session is valid */
 	mutex_lock(&ctxdata->mutex);
@@ -386,77 +386,77 @@ int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session)
 	if (IS_ERR(shm))
 		return PTR_ERR(shm);
 
-	msg_arg->cmd = OPTEE_MSG_CMD_CANCEL;
+	msg_arg->cmd = OPTEE2_MSG_CMD_CANCEL;
 	msg_arg->session = session;
 	msg_arg->cancel_id = cancel_id;
-	optee_do_call_with_arg(ctx, msg_parg);
+	optee2_do_call_with_arg(ctx, msg_parg);
 
 	tee_shm_free(shm);
 	return 0;
 }
 
 /**
- * optee_enable_shm_cache() - Enables caching of some shared memory allocation
+ * optee2_enable_shm_cache() - Enables caching of some shared memory allocation
  *			      in OP-TEE
- * @optee:	main service struct
+ * @optee2:	main service struct
  */
-void optee_enable_shm_cache(struct optee *optee)
+void optee2_enable_shm_cache(struct optee2 *optee2)
 {
-	struct optee_call_waiter w;
+	struct optee2_call_waiter w;
 
 	/* We need to retry until secure world isn't busy. */
-	optee_cq_wait_init(&optee->call_queue, &w);
+	optee2_cq_wait_init(&optee2->call_queue, &w);
 	while (true) {
-		optee_res_t res;
+		optee2_res_t res;
 
-		optee->invoke_fn(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+		optee2->invoke_fn(OPTEE2_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
 				 0, &res);
-		if (res.a0 == OPTEE_SMC_RETURN_OK)
+		if (res.a0 == OPTEE2_SMC_RETURN_OK)
 			break;
-		optee_cq_wait_for_completion(&optee->call_queue, &w);
+		optee2_cq_wait_for_completion(&optee2->call_queue, &w);
 	}
-	optee_cq_wait_final(&optee->call_queue, &w);
+	optee2_cq_wait_final(&optee2->call_queue, &w);
 }
 
 /**
- * optee_disable_shm_cache() - Disables caching of some shared memory allocation
+ * optee2_disable_shm_cache() - Disables caching of some shared memory allocation
  *			      in OP-TEE
- * @optee:	main service struct
+ * @optee2:	main service struct
  */
-void optee_disable_shm_cache(struct optee *optee)
+void optee2_disable_shm_cache(struct optee2 *optee2)
 {
-	struct optee_call_waiter w;
+	struct optee2_call_waiter w;
 
 	/* We need to retry until secure world isn't busy. */
-	optee_cq_wait_init(&optee->call_queue, &w);
+	optee2_cq_wait_init(&optee2->call_queue, &w);
 	while (true) {
 		union {
-			optee_res_t res;
-			struct optee_smc_disable_shm_cache_result result;
+			optee2_res_t res;
+			struct optee2_smc_disable_shm_cache_result result;
 		} res;
 
-		optee->invoke_fn(OPTEE_SMC_DISABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+		optee2->invoke_fn(OPTEE2_SMC_DISABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
 				 0, &res.res);
-		if (res.result.status == OPTEE_SMC_RETURN_ENOTAVAIL)
+		if (res.result.status == OPTEE2_SMC_RETURN_ENOTAVAIL)
 			break; /* All shm's freed */
-		if (res.result.status == OPTEE_SMC_RETURN_OK) {
+		if (res.result.status == OPTEE2_SMC_RETURN_OK) {
 			struct tee_shm *shm;
 
 			shm = reg_pair_to_ptr(res.result.shm_upper32,
 					      res.result.shm_lower32);
 			tee_shm_free(shm);
 		} else {
-			optee_cq_wait_for_completion(&optee->call_queue, &w);
+			optee2_cq_wait_for_completion(&optee2->call_queue, &w);
 		}
 	}
-	optee_cq_wait_final(&optee->call_queue, &w);
+	optee2_cq_wait_final(&optee2->call_queue, &w);
 }
 
 #define PAGELIST_ENTRIES_PER_PAGE				\
-	((OPTEE_MSG_NONCONTIG_PAGE_SIZE / sizeof(u64)) - 1)
+	((OPTEE2_MSG_NONCONTIG_PAGE_SIZE / sizeof(u64)) - 1)
 
 /**
- * optee_fill_pages_list() - write list of user pages to given shared
+ * optee2_fill_pages_list() - write list of user pages to given shared
  * buffer.
  *
  * @dst: page-aligned buffer where list of pages will be stored
@@ -467,13 +467,13 @@ void optee_disable_shm_cache(struct optee *optee)
  * @dst should be big enough to hold list of user page addresses and
  *	links to the next pages of buffer
  */
-void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
+void optee2_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
 			   size_t page_offset)
 {
 	int n = 0;
-	phys_addr_t optee_page;
+	phys_addr_t optee2_page;
 	/*
-	 * Refer to OPTEE_MSG_ATTR_NONCONTIG description in optee_msg.h
+	 * Refer to OPTEE2_MSG_ATTR_NONCONTIG description in optee2_msg.h
 	 * for details.
 	 */
 	struct {
@@ -489,7 +489,7 @@ void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
 	 * code heavily relies on this assumption, so it is better be
 	 * safe than sorry.
 	 */
-	BUILD_BUG_ON(PAGE_SIZE < OPTEE_MSG_NONCONTIG_PAGE_SIZE);
+	BUILD_BUG_ON(PAGE_SIZE < OPTEE2_MSG_NONCONTIG_PAGE_SIZE);
 
 	pages_data = (void *)dst;
 	/*
@@ -497,11 +497,11 @@ void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
 	 * larger than 4k/8k/12k/etc this will skip first 4k pages,
 	 * because they bear no value data for OP-TEE.
 	 */
-	optee_page = page_to_phys(*pages) +
-		round_down(page_offset, OPTEE_MSG_NONCONTIG_PAGE_SIZE);
+	optee2_page = page_to_phys(*pages) +
+		round_down(page_offset, OPTEE2_MSG_NONCONTIG_PAGE_SIZE);
 
 	while (true) {
-		pages_data->pages_list[n++] = optee_page;
+		pages_data->pages_list[n++] = optee2_page;
 
 		if (n == PAGELIST_ENTRIES_PER_PAGE) {
 			pages_data->next_page_data =
@@ -510,12 +510,12 @@ void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
 			n = 0;
 		}
 
-		optee_page += OPTEE_MSG_NONCONTIG_PAGE_SIZE;
-		if (!(optee_page & ~PAGE_MASK)) {
+		optee2_page += OPTEE2_MSG_NONCONTIG_PAGE_SIZE;
+		if (!(optee2_page & ~PAGE_MASK)) {
 			if (!--num_pages)
 				break;
 			pages++;
-			optee_page = page_to_phys(*pages);
+			optee2_page = page_to_phys(*pages);
 		}
 	}
 }
@@ -528,15 +528,15 @@ static size_t get_pages_list_size(size_t num_entries)
 {
 	int pages = DIV_ROUND_UP(num_entries, PAGELIST_ENTRIES_PER_PAGE);
 
-	return pages * OPTEE_MSG_NONCONTIG_PAGE_SIZE;
+	return pages * OPTEE2_MSG_NONCONTIG_PAGE_SIZE;
 }
 
-u64 *optee_allocate_pages_list(size_t num_entries)
+u64 *optee2_allocate_pages_list(size_t num_entries)
 {
 	return alloc_pages_exact(get_pages_list_size(num_entries), GFP_KERNEL);
 }
 
-void optee_free_pages_list(void *list, size_t num_entries)
+void optee2_free_pages_list(void *list, size_t num_entries)
 {
 	free_pages_exact(list, get_pages_list_size(num_entries));
 }
@@ -585,12 +585,12 @@ static int check_mem_type(unsigned long start, size_t num_pages)
 	return rc;
 }
 
-int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
+int optee2_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 		       struct page **pages, size_t num_pages,
 		       unsigned long start)
 {
 	struct tee_shm *shm_arg = NULL;
-	struct optee_msg_arg *msg_arg;
+	struct optee2_msg_arg *msg_arg;
 	u64 *pages_list;
 	phys_addr_t msg_parg;
 	int rc;
@@ -602,7 +602,7 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 	if (rc)
 		return rc;
 
-	pages_list = optee_allocate_pages_list(num_pages);
+	pages_list = optee2_allocate_pages_list(num_pages);
 	if (!pages_list)
 		return -ENOMEM;
 
@@ -612,12 +612,12 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 		goto out;
 	}
 
-	optee_fill_pages_list(pages_list, pages, num_pages,
+	optee2_fill_pages_list(pages_list, pages, num_pages,
 			      tee_shm_get_page_offset(shm));
 
-	msg_arg->cmd = OPTEE_MSG_CMD_REGISTER_SHM;
-	msg_arg->params->attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
-				OPTEE_MSG_ATTR_NONCONTIG;
+	msg_arg->cmd = OPTEE2_MSG_CMD_REGISTER_SHM;
+	msg_arg->params->attr = OPTEE2_MSG_ATTR_TYPE_TMEM_OUTPUT |
+				OPTEE2_MSG_ATTR_NONCONTIG;
 	msg_arg->params->u.tmem.shm_ref = (unsigned long)shm;
 	msg_arg->params->u.tmem.size = tee_shm_get_size(shm);
 	/*
@@ -625,22 +625,22 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 	 * store buffer offset from 4k page, as described in OP-TEE ABI.
 	 */
 	msg_arg->params->u.tmem.buf_ptr = virt_to_phys(pages_list) |
-	  (tee_shm_get_page_offset(shm) & (OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1));
+	  (tee_shm_get_page_offset(shm) & (OPTEE2_MSG_NONCONTIG_PAGE_SIZE - 1));
 
-	if (optee_do_call_with_arg(ctx, msg_parg) ||
+	if (optee2_do_call_with_arg(ctx, msg_parg) ||
 	    msg_arg->ret != TEEC_SUCCESS)
 		rc = -EINVAL;
 
 	tee_shm_free(shm_arg);
 out:
-	optee_free_pages_list(pages_list, num_pages);
+	optee2_free_pages_list(pages_list, num_pages);
 	return rc;
 }
 
-int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
+int optee2_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
 {
 	struct tee_shm *shm_arg;
-	struct optee_msg_arg *msg_arg;
+	struct optee2_msg_arg *msg_arg;
 	phys_addr_t msg_parg;
 	int rc = 0;
 
@@ -648,19 +648,19 @@ int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
 	if (IS_ERR(shm_arg))
 		return PTR_ERR(shm_arg);
 
-	msg_arg->cmd = OPTEE_MSG_CMD_UNREGISTER_SHM;
+	msg_arg->cmd = OPTEE2_MSG_CMD_UNREGISTER_SHM;
 
-	msg_arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
+	msg_arg->params[0].attr = OPTEE2_MSG_ATTR_TYPE_RMEM_INPUT;
 	msg_arg->params[0].u.rmem.shm_ref = (unsigned long)shm;
 
-	if (optee_do_call_with_arg(ctx, msg_parg) ||
+	if (optee2_do_call_with_arg(ctx, msg_parg) ||
 	    msg_arg->ret != TEEC_SUCCESS)
 		rc = -EINVAL;
 	tee_shm_free(shm_arg);
 	return rc;
 }
 
-int optee_shm_register_supp(struct tee_context *ctx, struct tee_shm *shm,
+int optee2_shm_register_supp(struct tee_context *ctx, struct tee_shm *shm,
 			    struct page **pages, size_t num_pages,
 			    unsigned long start)
 {
@@ -671,7 +671,7 @@ int optee_shm_register_supp(struct tee_context *ctx, struct tee_shm *shm,
 	return check_mem_type(start, num_pages);
 }
 
-int optee_shm_unregister_supp(struct tee_context *ctx, struct tee_shm *shm)
+int optee2_shm_unregister_supp(struct tee_context *ctx, struct tee_shm *shm)
 {
 	return 0;
 }

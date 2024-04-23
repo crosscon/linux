@@ -1,0 +1,5 @@
+config CROSSCON_ENCLAVE
+	tristate "CROSSCON Hypervisor Enclave support"
+
+	help
+        This implements a communication interface between the linux guest and the CROSSCON Hypervisor to create and manage CROSSCON enclaves.

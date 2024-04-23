@@ -187,3 +187,5 @@ obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
 obj-$(CONFIG_MOST)		+= most/
+obj-$(CONFIG_CROSSCON_ENCLAVE)	+= crossconenclave/
+obj-$(CONFIG_CMA_MALLOC)	+= cma/

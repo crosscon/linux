@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # OP-TEE Trusted Execution Environment Configuration
-config OPTEE
+config OPTEE2
 	tristate "OP-TEE"
 	depends on HAVE_ARM_SMCCC || RISCV_SBI
 	depends on MMU
@@ -8,7 +8,7 @@ config OPTEE
 	  This implements the OP-TEE Trusted Execution Environment (TEE)
 	  driver.
 
-config OPTEE_SHM_NUM_PRIV_PAGES
+config OPTEE2_SHM_NUM_PRIV_PAGES
 	int "Private Shared Memory Pages"
 	default 1
 	depends on OPTEE

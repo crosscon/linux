@@ -1,0 +1,5 @@
+config CMA_MALLOC
+	tristate "CMA driver"
+
+	help
+        This implements a contiguous memory allocator driver

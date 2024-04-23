@@ -2,28 +2,92 @@
 /*
  * Copyright (c) 2015-2019, Linaro Limited
  */
-#ifndef OPTEE_SMC_H
-#define OPTEE_SMC_H
+#ifndef OPTEE_SBI_H
+#define OPTEE_SBI_H
 
-#include <linux/arm-smccc.h>
+// #include <linux/riscv-sbicc.h>
 #include <linux/bitops.h>
 
 
-typedef struct arm_smccc_res optee_res_t;
+#define SBI_EXTID_TEE (0x544545)
+
+#if defined(CONFIG_HAVE_RISCV_SBI)
+typedef struct arm_smccc_res optee_res;
+#elif defined(CONFIG_RISCV_SBI)
+/**
+ * optee_res_t - Result from SMC/HVC call
+ * @a0-a3 result values from registers 0 to 3
+ */
+struct sbiret {
+	unsigned long a0;
+	unsigned long a1;
+	unsigned long a2;
+	unsigned long a3;
+};
+
+typedef struct sbiret optee_res_t;
+
+#endif
+
+#define RISCV_SBI_STD_CALL	        (0UL)
+#define RISCV_SBI_FAST_CALL	        (1UL)
+#define RISCV_SBI_TYPE_SHIFT		31
+
+#define RISCV_SBI_SMC_32		0
+#define RISCV_SBI_SMC_64		1
+#define RISCV_SBI_CALL_CONV_SHIFT	30
+
+#define RISCV_SBI_OWNER_MASK		0x3F
+#define RISCV_SBI_OWNER_SHIFT		24
+
+#define RISCV_SBI_FUNC_MASK		0xFFFF
+
+#define RISCV_SBI_IS_FAST_CALL(smc_val)	\
+	((smc_val) & (RISCV_SBI_FAST_CALL << RISCV_SBI_TYPE_SHIFT))
+#define RISCV_SBI_IS_64(smc_val) \
+	((smc_val) & (RISCV_SBI_SMC_64 << RISCV_SBI_CALL_CONV_SHIFT))
+#define RISCV_SBI_FUNC_NUM(smc_val)	((smc_val) & RISCV_SBI_FUNC_MASK)
+#define RISCV_SBI_OWNER_NUM(smc_val) \
+	(((smc_val) >> RISCV_SBI_OWNER_SHIFT) & RISCV_SBI_OWNER_MASK)
+
+#define RISCV_SBI_CALL_VAL(type, calling_convention, owner, func_num) \
+	(((type) << RISCV_SBI_TYPE_SHIFT) | \
+	((calling_convention) << RISCV_SBI_CALL_CONV_SHIFT) | \
+	(((owner) & RISCV_SBI_OWNER_MASK) << RISCV_SBI_OWNER_SHIFT) | \
+	((func_num) & RISCV_SBI_FUNC_MASK))
+
+#define RISCV_SBI_OWNER_ARCH		0
+#define RISCV_SBI_OWNER_CPU		1
+#define RISCV_SBI_OWNER_SIP		2
+#define RISCV_SBI_OWNER_OEM		3
+#define RISCV_SBI_OWNER_STANDARD	4
+#define RISCV_SBI_OWNER_STANDARD_HYP	5
+#define RISCV_SBI_OWNER_VENDOR_HYP	6
+#define RISCV_SBI_OWNER_TRUSTED_APP	48
+#define RISCV_SBI_OWNER_TRUSTED_APP_END	49
+#define RISCV_SBI_OWNER_TRUSTED_OS	50
+#define RISCV_SBI_OWNER_TRUSTED_OS_END	63
+
+#define RISCV_SBI_QUIRK_NONE		0
+#define RISCV_SBI_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
+
+#define RISCV_SBI_VERSION_1_0		0x10000
+#define RISCV_SBI_VERSION_1_1		0x10001
+#define RISCV_SBI_VERSION_1_2		0x10002
 
 #define OPTEE_SMC_STD_CALL_VAL(func_num) \
-	ARM_SMCCC_CALL_VAL(ARM_SMCCC_STD_CALL, ARM_SMCCC_SMC_32, \
-			   ARM_SMCCC_OWNER_TRUSTED_OS, (func_num))
+	RISCV_SBI_CALL_VAL(RISCV_SBI_STD_CALL, RISCV_SBI_SMC_32, \
+			   RISCV_SBI_OWNER_TRUSTED_OS, (func_num))
 #define OPTEE_SMC_FAST_CALL_VAL(func_num) \
-	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_32, \
-			   ARM_SMCCC_OWNER_TRUSTED_OS, (func_num))
+	RISCV_SBI_CALL_VAL(RISCV_SBI_FAST_CALL, RISCV_SBI_SMC_32, \
+			   RISCV_SBI_OWNER_TRUSTED_OS, (func_num))
 
 /*
  * Function specified by SMC Calling convention.
  */
 #define OPTEE_SMC_FUNCID_CALLS_COUNT	0xFF00
 #define OPTEE_SMC_CALLS_COUNT \
-	ARM_SMCCC_CALL_VAL(OPTEE_SMC_FAST_CALL, SMCCC_SMC_32, \
+	RISCV_SBI_CALL_VAL(OPTEE_SMC_FAST_CALL, SMCCC_SMC_32, \
 			   SMCCC_OWNER_TRUSTED_OS_END, \
 			   OPTEE_SMC_FUNCID_CALLS_COUNT)
 
@@ -49,8 +113,8 @@ typedef struct arm_smccc_res optee_res_t;
  */
 #define OPTEE_SMC_FUNCID_CALLS_UID OPTEE_MSG_FUNCID_CALLS_UID
 #define OPTEE_SMC_CALLS_UID \
-	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_32, \
-			   ARM_SMCCC_OWNER_TRUSTED_OS_END, \
+	RISCV_SBI_CALL_VAL(RISCV_SBI_FAST_CALL, RISCV_SBI_SMC_32, \
+			   RISCV_SBI_OWNER_TRUSTED_OS_END, \
 			   OPTEE_SMC_FUNCID_CALLS_UID)
 
 /*
@@ -61,8 +125,8 @@ typedef struct arm_smccc_res optee_res_t;
  */
 #define OPTEE_SMC_FUNCID_CALLS_REVISION OPTEE_MSG_FUNCID_CALLS_REVISION
 #define OPTEE_SMC_CALLS_REVISION \
-	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_32, \
-			   ARM_SMCCC_OWNER_TRUSTED_OS_END, \
+	RISCV_SBI_CALL_VAL(RISCV_SBI_FAST_CALL, RISCV_SBI_SMC_32, \
+			   RISCV_SBI_OWNER_TRUSTED_OS_END, \
 			   OPTEE_SMC_FUNCID_CALLS_REVISION)
 
 struct optee_smc_calls_revision_result {

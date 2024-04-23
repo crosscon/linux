@@ -45,7 +45,7 @@ static int pool_op_alloc(struct tee_shm_pool_mgr *poolm,
 		}
 
 		shm->flags |= TEE_SHM_REGISTER;
-		rc = optee_shm_register(shm->ctx, shm, pages, nr_pages,
+		rc = optee2_shm_register(shm->ctx, shm, pages, nr_pages,
 					(unsigned long)shm->kaddr);
 		kfree(pages);
 	}
@@ -57,7 +57,7 @@ static void pool_op_free(struct tee_shm_pool_mgr *poolm,
 			 struct tee_shm *shm)
 {
 	if (shm->flags & TEE_SHM_DMA_BUF)
-		optee_shm_unregister(shm->ctx, shm);
+		optee2_shm_unregister(shm->ctx, shm);
 
 	free_pages((unsigned long)shm->kaddr, get_order(shm->size));
 	shm->kaddr = NULL;
@@ -75,12 +75,12 @@ static const struct tee_shm_pool_mgr_ops pool_ops = {
 };
 
 /**
- * optee_shm_pool_alloc_pages() - create page-based allocator pool
+ * optee2_shm_pool_alloc_pages() - create page-based allocator pool
  *
  * This pool is used when OP-TEE supports dymanic SHM. In this case
  * command buffers and such are allocated from kernel's own memory.
  */
-struct tee_shm_pool_mgr *optee_shm_pool_alloc_pages(void)
+struct tee_shm_pool_mgr *optee2_shm_pool_alloc_pages(void)
 {
 	struct tee_shm_pool_mgr *mgr = kzalloc(sizeof(*mgr), GFP_KERNEL);
 
