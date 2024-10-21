@@ -50,7 +50,7 @@ static long allocate(struct cma_space_request_struct *req)
 		return -EINVAL;
 	cpu_addr =
 		dma_alloc_noncoherent(dma_dev, req->size, &dma_handle, DMA_BIDIRECTIONAL, GFP_USER);
-		printk("dma_alloc_noncoherent(0x%llx, 0x%llx, 0x%llx, %d, %x);\n",dma_dev, req->size, &dma_handle, DMA_BIDIRECTIONAL, GFP_USER);
+		/* printk("dma_alloc_noncoherent(0x%llx, 0x%llx, 0x%llx, %d, %x);\n",dma_dev, req->size, &dma_handle, DMA_BIDIRECTIONAL, GFP_USER); */
 	if (cpu_addr == NULL) {
 		return -ENOMEM;
 	} else {
@@ -199,21 +199,21 @@ static int __init cma_malloc_init(void)
 		dma_dev->coherent_dma_mask = DMA_BIT_MASK(32);
 		dma_dev->dma_mask = &dma_dev->coherent_dma_mask;
 	}
-	/*Enable user-mode access to counters. */
-	asm volatile("msr pmuserenr_el0, %0" : : "r"(0b1111));
+	/*/1*Enable user-mode access to counters. *1/ */
+	/*asm volatile("msr pmuserenr_el0, %0" : : "r"(0b1111)); */
 
-	/*   Performance Monitors Count Enable Set register bit 30:0 disable, 31 enable. Can also enable other event counters here. */ 
-	asm volatile("msr pmcntenset_el0, %0" : : "r" (1<<32));
+	/*/1*   Performance Monitors Count Enable Set register bit 30:0 disable, 31 enable. Can also enable other event counters here. *1/ */ 
+	/*asm volatile("msr pmcntenset_el0, %0" : : "r" (1<<32)); */
 
-	/* Enable counters */
-	u64 val=0;
-	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
-	asm volatile("msr pmcr_el0, %0" : : "r" (val|1));
+	/*/1* Enable counters *1/ */
+	/*u64 val=0; */
+	/*asm volatile("mrs %0, pmcr_el0" : "=r" (val)); */
+	/*asm volatile("msr pmcr_el0, %0" : : "r" (val|1)); */
 
-	asm volatile("mrs %0, PMCEID0_EL0" : : "r" (val));
-	printk("PMCEID0_EL0 = 0x%lx", val);
-	asm volatile("mrs %0, PMCEID1_EL0" : : "r" (val));
-	printk("PMCEID1_EL0 = 0x%lx", val);
+	/*asm volatile("mrs %0, PMCEID0_EL0" : : "r" (val)); */
+	/*printk("PMCEID0_EL0 = 0x%lx", val); */
+	/*asm volatile("mrs %0, PMCEID1_EL0" : : "r" (val)); */
+	/*printk("PMCEID1_EL0 = 0x%lx", val); */
 
 
 	return ret;

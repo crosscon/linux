@@ -85,7 +85,7 @@ enum {
 static irqreturn_t crossconenclave_irq_handler(int irq, void *device_id)
 {
 	struct crossconenclave_device *member_crossconenclave_device = NULL;
-	pr_info("interrupt occurred on IRQ %d\n", irq);
+	/* pr_info("interrupt occurred on IRQ %d\n", irq); */
 
 	member_crossconenclave_device = device_id;
 
@@ -166,15 +166,15 @@ static ssize_t crossconenclave_device_read(struct file *filp, char *buf,
 	//if (ret != 0)
 	//	goto exit;
 
-	pr_info("Data is available now!\n");
+	/* pr_info("Data is available now!\n"); */
 
 	if (!is_read_valid(member_crossconenclave_device, count, ppos)) {
 		pr_info("invalid reading [%lu], ppos %llx\n", count, *ppos);
 		return -1;
 	}
 
-	pr_info("reading [%lu], from %p\n", count,
-		member_crossconenclave_device->shared_memory.ptr + *ppos);
+	/* pr_info("reading [%lu], from %p\n", count, */
+	/* 	member_crossconenclave_device->shared_memory.ptr + *ppos); */
 
 	if (!copy_to_user(buf,
 			  &member_crossconenclave_device->shared_memory.ptr[*ppos],
@@ -193,21 +193,21 @@ static ssize_t crossconenclave_device_write(struct file *filp, const char *buf,
 {
 	struct crossconenclave_device *member_crossconenclave_device = filp->private_data;
 	if (!is_write_valid(member_crossconenclave_device, count, ppos)) {
-		pr_info("invalid writing [%lu], ppos %llx\n", count, *ppos);
+		/* pr_info("invalid writing [%lu], ppos %llx\n", count, *ppos); */
 		return -1;
 	}
 
-	pr_info("writing [%lu], from %llx\n", count,
-		(long long unsigned int)(member_crossconenclave_device->shared_memory
-						 .ptr +
-					 *ppos));
+	/* pr_info("writing [%lu], from %llx\n", count, */
+	/* 	(long long unsigned int)(member_crossconenclave_device->shared_memory */
+	/* 					 .ptr + */
+	/* 				 *ppos)); */
 
 	if (!copy_from_user(&member_crossconenclave_device->shared_memory.ptr[*ppos],
 			    buf, count)) {
 		return -2;
 	}
 
-	pr_info("%s", &member_crossconenclave_device->shared_memory.ptr[*ppos]);
+	/* pr_info("%s", &member_crossconenclave_device->shared_memory.ptr[*ppos]); */
 
 	(*ppos) += count;
 
@@ -325,14 +325,14 @@ crossconenclave_create(struct crossconenclave_device *member_crossconenclave_dev
      * of time */
     for (i = data_va_start; i < data_va_end; i+=PAGE_SIZE) {
 	phys_addr = virt_to_phys_user(i);
-	printk("data rgn phys_addr: %llx virt_addr: %llx\n", phys_addr, i);
+	/* printk("data rgn phys_addr: %llx virt_addr: %llx\n", phys_addr, i); */
 	crossconenclave_hvc(HC_ENCLAVE_ADD_RGN, buf.eid, phys_addr, i, &res);
     }
     uintptr_t stack_start = current->mm->start_stack;
     /* stack grows towards zero */
     for (i = stack_start; i > (stack_start - PAGE_SIZE); i-=PAGE_SIZE) {
 	phys_addr = virt_to_phys_user(i);
-	printk("stack rgn phys_addr: %llx virt_addr: %llx\n", phys_addr, i);
+	/* printk("stack rgn phys_addr: %llx virt_addr: %llx\n", phys_addr, i); */
 	crossconenclave_hvc(HC_ENCLAVE_ADD_RGN, buf.eid, phys_addr, i, &res);
     }
 
@@ -342,7 +342,7 @@ crossconenclave_create(struct crossconenclave_device *member_crossconenclave_dev
 	phys_addr = virt_to_phys_user(i);
 	if(phys_addr == NULL)
 	    continue;
-	printk("heap rgn phys_addr: %llx virt_addr: %llx\n", phys_addr, i);
+	/* printk("heap rgn phys_addr: %llx virt_addr: %llx\n", phys_addr, i); */
 	crossconenclave_hvc(HC_ENCLAVE_ADD_RGN, buf.eid, phys_addr, i, &res);
     }
 #endif
@@ -474,7 +474,7 @@ _crossconenclave_device_ioctl(struct crossconenclave_device *member_crossconencl
 	case CROSSCONENCLAVE_DEVICE_IOC_RING:
 		crossconenclave_hvc(
 			/*hvc_id for crosscon*/ 0x10000,
-			/* shared_memory_id */ member_crossconenclave_device->id, 0,
+			member_crossconenclave_device->id, 0,
 			0, &res);
 		break;
 	case CROSSCONENCLAVE_DEVICE_IOC_READ:
@@ -534,7 +534,7 @@ static int crosscon_ipc_irq_init(struct crossconenclave_device *member_crosscone
 		return -EIO;
 	}
 
-	pr_info("registered for IRQ %d\n", member_crossconenclave_device->irq);
+	/* pr_info("registered for IRQ %d\n", member_crossconenclave_device->irq); */
 
 	return 0;
 }
@@ -543,8 +543,8 @@ static int setup_shared_memory(struct crossconenclave_device *crossconenclave)
 {
 	crossconenclave->shared_memory.ptr =
 		phys_to_virt(crossconenclave->shared_memory.base);
-	pr_info("phys_to_virt %llx: %llx\n", crossconenclave->shared_memory.base,
-		(long long unsigned int)(crossconenclave->shared_memory.ptr));
+	/* pr_info("phys_to_virt %llx: %llx\n", crossconenclave->shared_memory.base, */
+	/* 	(long long unsigned int)(crossconenclave->shared_memory.ptr)); */
 
 	return 0;
 }
@@ -612,11 +612,11 @@ int crossconenclave_device_register(const char *label, unsigned int id,
 
 	crosscon_ipc_irq_init(member_crossconenclave_device);
 
-	pr_info("crossconenclave %s with id %u; irq %ul; base: %llx; size %lu; added\n",
-		member_crossconenclave_device->label, member_crossconenclave_device->id,
-		member_crossconenclave_device->irq,
-		member_crossconenclave_device->shared_memory.base,
-		member_crossconenclave_device->shared_memory.size);
+	/* pr_info("crossconenclave %s with id %u; irq %ul; base: %llx; size %lu; added\n", */
+	/* 	member_crossconenclave_device->label, member_crossconenclave_device->id, */
+	/* 	member_crossconenclave_device->irq, */
+	/* 	member_crossconenclave_device->shared_memory.base, */
+	/* 	member_crossconenclave_device->shared_memory.size); */
 
 	return 0;
 
@@ -673,7 +673,7 @@ static int __init crossconenclave_device_init(void)
 {
 	int ret;
 	/* ls /sys/class */
-	pr_info("preparing /sys/class \n");
+	/* pr_info("preparing /sys/class \n"); */
 	if ((cl = class_create(THIS_MODULE, CROSSCON_ENCLAVE_DEVICE_NAME "_sys")) ==
 	    NULL) //$ls /sys/class
 	{
@@ -685,7 +685,7 @@ static int __init crossconenclave_device_init(void)
 	}
 
 	/* proc/devices */
-	pr_info("preparing /proc/devices \n");
+	/* pr_info("preparing /proc/devices \n"); */
 	ret = alloc_chrdev_region(&crossconenclave_device_dev_t, 0, MAX_DEVICES,
 				  CROSSCON_ENCLAVE_DEVICE_NAME "_proc");
 	if (ret < 0) {
@@ -694,7 +694,7 @@ static int __init crossconenclave_device_init(void)
 		       ret);
 		return ret;
 	}
-	pr_info("got major %d\n", MAJOR(crossconenclave_device_dev_t));
+	/* pr_info("got major %d\n", MAJOR(crossconenclave_device_dev_t)); */
 
 	pr_info(CROSSCON_ENCLAVE_DEVICE_NAME " initialized\n");
 	return 0;
@@ -710,5 +710,5 @@ module_init(crossconenclave_device_init);
 module_exit(crossconenclave_device_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Garou");
+MODULE_AUTHOR("crosscon");
 MODULE_DESCRIPTION("crossconEnclave driver");

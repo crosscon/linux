@@ -71,5 +71,5 @@ static struct platform_driver crossconenclave_req_driver = {
 module_platform_driver(crossconenclave_req_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Garou");
+MODULE_AUTHOR("crosscon");
 MODULE_DESCRIPTION("crossconEnclave driver");

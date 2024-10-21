@@ -686,8 +686,6 @@ static int optee2_probe(struct platform_device *pdev)
 	u32 sec_caps;
 	int rc;
 
-	pr_info("CROSSCON optee2: %s\n", pdev->name);
-
 	invoke_fn = get_invoke_func(&pdev->dev);
 	if (IS_ERR(invoke_fn))
 		return PTR_ERR(invoke_fn);
