@@ -1,0 +1,5 @@
+config CROSSCONHYP_SHMEM
+	tristate "CROSSCON Hypervisor shared memory support"
+
+	help
+	  This implements an interface to communicate with CROSSCON Hypervisor hosted guests.

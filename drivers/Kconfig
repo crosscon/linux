@@ -237,6 +237,9 @@ source "drivers/counter/Kconfig"
 source "drivers/most/Kconfig"
 
 source "drivers/crossconenclave/Kconfig"
+
 source "drivers/cma/Kconfig"
+
+source "drivers/crossconipc/Kconfig"
 
 endmenu
